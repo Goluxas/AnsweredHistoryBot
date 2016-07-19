@@ -94,6 +94,35 @@ def post_reply(r, sub, title, text):
 	# if it failed to submit all 5 times, raise an exception
 	raise Exception
 
+def post_answer_comment(post, answer)
+	# post each answer as a top-level comment that links to the original post
+	# ie.
+	"""
+	[Goluxas replies:](link to comment)
+
+	> First 80 characters of response...
+	"""
+
+	# not using /u/ notation because that sends a notification to the author every time
+	body = sanitize_body(answer.body)
+	text = u'[%s replies:](%s)\n\n> %s...' % (answer.author, answer.permalink, body)
+
+	tries = 5
+	while tries > 0:
+		success = True
+		try:
+			post.add_comment(text)
+		except:
+			success = False
+			tries -= 1
+		finally:
+			if success:
+				return post
+		print '---- Failed to post answer comment. (%d retries left.)' % tries
+
+	# if it failed to submit all 5 times, raise an exception
+	raise Exception
+
 if __name__ == '__main__':
 	# thread_id: previous comment count
 	scanned = {} # k,v = AskHistorians thread id, number of comments on last scan
@@ -209,33 +238,17 @@ if __name__ == '__main__':
 
 				print '---- Posting answers...'
 				for a in answers:
-					# post each answer as a top-level comment that links to the original post
-					# ie.
-					"""
-					[Goluxas replies:](link to comment)
-
-					> First 80 characters of response...
-					"""
-
 					# check if it's already been posted
 					if a.id not in prev_answers:
-						# not using /u/ notation because that sends a notification to the author every time
-						body = sanitize_body(a.body)
-						text = u'[%s replies:](%s)\n\n> %s...' % (a.author, a.permalink, body)
-
 						try:
-							posts[post.id].add_comment(text)
-							#new_post.set_flair(flair_text=str(a.author))
+							post_answer_comment(posts[post.id], a)
+						except:
+							print '----- SKIPPED: Out of retries.'
+							continue
 
-							if post.id not in posted:
-								posted[post.id] = [a.id]
-							else:
-								posted[post.id].append(a.id)
+						posted[post.id] = posted.get(post.id, []).append(a.id)
 
-							print u'---- New answer from /u/%s' % unicode(a.author).encode('ascii','replace')
-
-						except praw.errors.AlreadySubmitted:
-							print '---- EXCEPTION: Answer already posted but not in posted dict!'
+						print u'---- New answer from /u/%s' % unicode(a.author).encode('ascii','replace')
 
 					else:
 						prev_answers.remove(a.id)
@@ -248,9 +261,10 @@ if __name__ == '__main__':
 
 				# anything left in prev_answers failed to meet the answer criteria
 				# (it was probably deleted)
-				print '-- %d previous answer(s) not found' % len(prev_answers)
+				if len(prev_answers) > 0:
+					print '-- %d previous answer(s) not found' % len(prev_answers)
 				for missing in prev_answers:
-					# add a 'deleted' tag to the post
+					# TODO - delete or replace text with [deleted] on original comment
 					#posts[a.id].set_flair('DELETED') -- will no longer work
 					#print u'-- Marked as Deleted: %s' % posts[a.id].title
 					print 'SHOULD BE MARKED DELETED: %s' % missing
