@@ -200,7 +200,7 @@ if __name__ == '__main__':
 					if a.id not in prev_answers:
 						# not using /u/ notation because that sends a notification to the author every time
 						body = sanitize_body(a.body)
-						text = u'[%s replies:](%s)\n\n> [%s...]' % (a.author, a.permalink, body)
+						text = u'[%s replies:](%s)\n\n> %s...' % (a.author, a.permalink, body)
 
 						try:
 							posts[post.id].add_comment(text)
