@@ -137,9 +137,10 @@ if __name__ == '__main__':
 
 				status = None
 				# if it's a meta post, skip it
-				if post.link_flair_text and \
+				if (post.link_flair_text and \
 					(post.link_flair_text.lower() == 'meta' or \
-					 post.link_flair_text.lower() == 'feature'): 
+					 post.link_flair_text.lower() == 'feature')) or \
+					 '[meta]' in post.title.lower():
 						status = 'Meta/Feature Post'
 
 				# if it's a distinguished mod post, skip it
