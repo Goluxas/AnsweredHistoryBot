@@ -78,6 +78,22 @@ def sanitize_body(answer_body):
 	
 	return body
 
+def post_reply(r, sub, title, text):
+	tries = 5
+	while tries > 0:
+		success = True
+		try:
+			post = r.submit(sub, title, text=text)
+		except:
+			success = False
+			tries -= 1
+		finally:
+			if success:
+				return post
+
+	# if it failed to submit all 5 times, raise an exception
+	raise Exception
+
 if __name__ == '__main__':
 	# thread_id: previous comment count
 	scanned = {} # k,v = AskHistorians thread id, number of comments on last scan
@@ -178,7 +194,11 @@ if __name__ == '__main__':
 						max_title_length = 300 - len(META_POST_TITLE) + 4 - len(str(post.author)) - 3
 						post_title = META_POST_TITLE % (post.title[:max_title_length] + '...', post.author)
 					post_text = '[ORIGINAL THREAD](%s)' % post.short_link
-					posts[post.id] = r.submit(answers_sub, post_title, text=post_text)
+					try:
+						posts[post.id] = post_reply(r, answers_sub, post_title, post_text)
+					except:
+						print '-- SKIPPED: Too many retries to post meta thread'
+						continue
 
 				# check for answers from a previous scan
 				if post.id in posted:
