@@ -26,6 +26,8 @@ USER_AGENT = "com.goluxas.AnsweredHistoryBot:v%s (by /u/Goluxas)" % VERSION
 MIN_CHARS = 300 
 WAIT_TIME = 30 # minutes
 
+META_POST_TITLE = u'Answers for "%s" (/u/%s)'
+
 DEBUG = True
 
 def find_answers(post):
@@ -168,7 +170,12 @@ if __name__ == '__main__':
 
 				# if there are any answers, make a thread for the post
 				if post.id not in posts:
-					post_title = u'Answers for "%s" (/u/%s)' % (post.title, post.author)
+					post_title = META_POST_TITLE % (post.title, post.author)
+					if len(post_title) > 300:
+						# +4 to make up for the two %s clusters in the format string
+						# -3 to make room for the ellipses
+						max_title_length = 300 - len(META_POST_TITLE) + 4 - len(str(post.author)) - 3
+						post_title = META_POST_TITLE % (post.title[:max_title_length] + '...', post.author)
 					post_text = '[ORIGINAL THREAD](%s)' % post.short_link
 					posts[post.id] = r.submit(answers_sub, post_title, text=post_text)
 
