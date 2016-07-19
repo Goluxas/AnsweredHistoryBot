@@ -34,41 +34,45 @@ def find_answers(post):
 	answers = []
 
 	print '-- Scanning for answers'
-	for c in post.comments:
-		try:
-			status = None
-			# obviously ignore removed comments
-			#if u'removed' in unicode(c.body): # no idea why this doesn't work, but it doesn't
-			if len(c.body) == 9:
-				status = 'Removed'
+	try:
+		for c in post.comments:
+			try:
+				status = None
+				# obviously ignore removed comments
+				#if u'removed' in unicode(c.body): # no idea why this doesn't work, but it doesn't
+				if len(c.body) == 9:
+					status = 'Removed'
 
-			# ignore distinguished moderator posts
-			if c.distinguished: 
-				status = 'Distinguished'
+				# ignore distinguished moderator posts
+				if c.distinguished: 
+					status = 'Distinguished'
 
-			# ignore follow-up questions
-			# not ENTIRELY sure the best way to do this
-			# for now, posts with less than MIN_CHARS are considered non-answers
-			if len(c.body) < MIN_CHARS:
-				status = 'Under Minimum Length (%d of %d chars)' % (len(c.body), MIN_CHARS)
+				# ignore follow-up questions
+				# not ENTIRELY sure the best way to do this
+				# for now, posts with less than MIN_CHARS are considered non-answers
+				if len(c.body) < MIN_CHARS:
+					status = 'Under Minimum Length (%d of %d chars)' % (len(c.body), MIN_CHARS)
 
-			# ignore posts that are less than 30m old
-			# (to give mods time to react)
-			age = (datetime.now() - datetime.fromtimestamp( c.created_utc )).seconds / 60
-			if age < 30:
-				status = 'Under Minimum Age (%d of %d minutes)' % (age, 30)
+				# ignore posts that are less than 30m old
+				# (to give mods time to react)
+				age = (datetime.now() - datetime.fromtimestamp( c.created_utc )).seconds / 60
+				if age < 30:
+					status = 'Under Minimum Age (%d of %d minutes)' % (age, 30)
 
-			if status:
-				print u'---- SKIPPED: %s (/u/%s)' % (status, unicode(c.author).encode('ascii', 'replace'))
-			else:
-				print u'---- ANSWER FOUND: "%s..." (/u/%s)' % (c.body[:25].encode('ascii', 'replace'), unicode(c.author).encode('ascii','replace'))
-				# anything left is potentially an answer
-				answers.append(c)
+				if status:
+					print u'---- SKIPPED: %s (/u/%s)' % (status, unicode(c.author).encode('ascii', 'replace'))
+				else:
+					print u'---- ANSWER FOUND: "%s..." (/u/%s)' % (c.body[:25].encode('ascii', 'replace'), unicode(c.author).encode('ascii','replace'))
+					# anything left is potentially an answer
+					answers.append(c)
 
-		except AttributeError:
-			# hit a MoreComments, so just skip it
-			print '---- SKIPPED: MoreComments'
-			continue
+			except AttributeError:
+				# hit a MoreComments, so just skip it
+				print '---- SKIPPED: MoreComments'
+				continue
+	except:
+		print '---- SKIPPED: PRAW Exception.'
+		return []
 
 	return answers
 
@@ -94,7 +98,7 @@ def post_reply(r, sub, title, text):
 	# if it failed to submit all 5 times, raise an exception
 	raise Exception
 
-def post_answer_comment(post, answer)
+def post_answer_comment(post, answer):
 	# post each answer as a top-level comment that links to the original post
 	# ie.
 	"""
