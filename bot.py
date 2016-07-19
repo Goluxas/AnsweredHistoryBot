@@ -24,6 +24,7 @@ USER_AGENT = "com.goluxas.AnsweredHistoryBot:v%s (by /u/Goluxas)" % VERSION
 # is expected to have (if i come up with a 
 # better solution this will be deprecated)
 MIN_CHARS = 300 
+WAIT_TIME = 30 # minutes
 
 DEBUG = True
 
@@ -68,6 +69,12 @@ def find_answers(post):
 			continue
 
 	return answers
+
+def sanitize_body(answer_body):
+	body = answer_body[:200]
+	body = body.replace('\n\n', '\n\n>')
+	
+	return body
 
 if __name__ == '__main__':
 	# thread_id: previous comment count
@@ -177,15 +184,16 @@ if __name__ == '__main__':
 					# post each answer as a top-level comment that links to the original post
 					# ie.
 					"""
-					/u/Goluxas replies:
+					[Goluxas replies:](link to comment)
 
-					> [First 80 characters of response](link to comment)
+					> First 80 characters of response...
 					"""
 
 					# check if it's already been posted
 					if a.id not in prev_answers:
 						# not using /u/ notation because that sends a notification to the author every time
-						text = u'%s replies:\n\n> [%s...](%s)' % (a.author, a.body[:200].replace('\n\n', '\n\n> '), a.permalink)
+						body = sanitize_body(a.body)
+						text = u'[%s replies:](%s)\n\n> [%s...]' % (a.author, a.permalink, body)
 
 						try:
 							posts[post.id].add_comment(text)
@@ -231,9 +239,9 @@ if __name__ == '__main__':
 			# TODO - scan inbox for missed answers
 
 			print 'Scan complete'
-			print 'Waiting 15 minutes...'
+			print 'Waiting %d minutes...' % WAIT_TIME
 			# wait 15 minutes
-			time.sleep(60 * 15)
+			time.sleep(60 * WAIT_TIME)
 
 	# Catch-all exception so we can write out the history even if it crashes for some reason
 	except:
