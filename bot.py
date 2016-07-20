@@ -13,12 +13,14 @@ for posts, so I created this bot as an alternative.
 """
 from datetime import datetime
 import time, os, json
+import logging
 
 import praw
 import OAuth2Util
 
 VERSION = '1.0'
 USER_AGENT = "com.goluxas.AnsweredHistoryBot:v%s (by /u/Goluxas)" % VERSION
+LOGFILE = 'answeredhistorybot.log'
 
 # the minimum number of characters an answer 
 # is expected to have (if i come up with a 
@@ -30,10 +32,18 @@ META_POST_TITLE = u'Answers for "%s" (/u/%s)'
 
 DEBUG = True
 
+logging.basicConfig(filename=LOGFILE, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %I:%M:%S')
+logger = logging.getLogger(__name__)
+
+if DEBUG:
+	logger.setLevel(logging.DEBUG)
+else:
+	logger.setLevel(logging.INFO)
+
 def find_answers(post):
 	answers = []
 
-	print '-- Scanning for answers'
+	logger.info('-- Scanning for answers')
 	try:
 		for c in post.comments:
 			try:
@@ -60,18 +70,18 @@ def find_answers(post):
 					status = 'Under Minimum Age (%d of %d minutes)' % (age, 30)
 
 				if status:
-					print u'---- SKIPPED: %s (/u/%s)' % (status, unicode(c.author).encode('ascii', 'replace'))
+					logger.info(u'---- SKIPPED: %s (/u/%s)' % (status, unicode(c.author).encode('ascii', 'replace')))
 				else:
-					print u'---- ANSWER FOUND: "%s..." (/u/%s)' % (c.body[:25].encode('ascii', 'replace'), unicode(c.author).encode('ascii','replace'))
+					logger.info(u'---- ANSWER FOUND: "%s..." (/u/%s)' % (c.body[:25].encode('ascii', 'replace'), unicode(c.author).encode('ascii','replace')))
 					# anything left is potentially an answer
 					answers.append(c)
 
 			except AttributeError:
 				# hit a MoreComments, so just skip it
-				print '---- SKIPPED: MoreComments'
+				logger.info('---- SKIPPED: MoreComments')
 				continue
 	except:
-		print '---- SKIPPED: PRAW Exception.'
+		logger.info('---- SKIPPED: PRAW Exception.')
 		return []
 
 	return answers
@@ -122,7 +132,7 @@ def post_answer_comment(post, answer):
 		finally:
 			if success:
 				return post
-		print '---- Failed to post answer comment. (%d retries left.)' % tries
+		logger.info('---- Failed to post answer comment. (%d retries left.)' % tries)
 
 	# if it failed to submit all 5 times, raise an exception
 	raise Exception
@@ -139,31 +149,31 @@ if __name__ == '__main__':
 	# maybe i can just read in the relevant data for the posts
 	# that get scanned
 	if os.path.isfile('history.json'):
-		print 'History file found. Loading...'
+		logger.info('History file found. Loading...')
 		with open('history.json', 'r') as infile:
 			data = json.load(infile)
 		scanned = data['scanned']
 		posted = data['posted']
 		post_ids = data['post_ids']
-		print 'History loaded. %d scanned posts. %d posts with answers.' % (len(scanned), len(posted))
+		logger.info('History loaded. %d scanned posts. %d posts with answers.' % (len(scanned), len(posted)))
 	else:
-		print 'Initializing history file...'
+		logger.info('Initializing history file...')
 		with open('history.json', 'w') as outfile:
 			data = {'scanned': {}, 'posted': {}, 'post_ids': {} }
 			json.dump(data, outfile)
-		print 'History initialized'
+		logger.info('History initialized')
 
-	print 'Bot initiated'
+	logger.info('Bot initiated')
 
 	r = praw.Reddit(user_agent=USER_AGENT)
 
 	# authenticate
 	o = OAuth2Util.OAuth2Util(r)
-	print 'Authenticated'
+	logger.info('Authenticated')
 
 	""" Shouldn't need this anymore
 	if len(post_ids) > 0:
-		print 'Loading previous posts'
+		logger.info('Loading previous posts')
 		ah = r.get_subreddit('askhistorians')
 		posts = { cid: r.get_submission(submission_id=pid) for cid, pid in post_ids.iteritems() }
 	"""
@@ -180,10 +190,10 @@ if __name__ == '__main__':
 			else:
 				answers_sub = r.get_subreddit('answeredhistory')
 
-			print 'Scanning posts...'
+			logger.info('Scanning posts...')
 
 			for post in ah.get_hot(limit=50):
-				print u'Post: %s - by %s' % (post.title.encode('ascii', 'replace'), unicode(post.author).encode('ascii', 'replace'))
+				logger.info(u'Post: %s - by %s' % (post.title.encode('ascii', 'replace'), unicode(post.author).encode('ascii', 'replace')))
 
 				status = None
 				# if it's a meta post, skip it
@@ -208,15 +218,15 @@ if __name__ == '__main__':
 				scanned[post.id] = post.num_comments
 				
 				if status:
-					print '-- SKIPPED: %s' % status
+					logger.info('-- SKIPPED: %s' % status)
 					continue
 
 				# otherwise, look for answers
 				answers = find_answers(post)
-				print '-- %d answer(s) found' % len(answers)
+				logger.info('-- %d answer(s) found' % len(answers))
 
 				if len(answers) == 0:
-					print '-- SKIPPED'
+					logger.info('-- SKIPPED')
 					continue
 
 				# if there are any answers, make a thread for the post
@@ -236,25 +246,25 @@ if __name__ == '__main__':
 						try:
 							posts[post.id] = post_reply(r, answers_sub, post_title, post_text)
 						except:
-							print '-- SKIPPED: Too many retries to post meta thread'
+							logger.info('-- SKIPPED: Too many retries to post meta thread')
 							continue
 
 				#import pdb; pdb.set_trace()
 				# check for answers from a previous scan
 				if post.id in posted:
 					prev_answers = list(posted[post.id]) # using list() to copy the list
-					print '-- %d answer(s) previously found' % len(prev_answers)
+					logger.info('-- %d answer(s) previously found' % len(prev_answers))
 				else:
 					prev_answers = []
 
-				print '---- Posting answers...'
+				logger.info('---- Posting answers...')
 				for a in answers:
 					# check if it's already been posted
 					if a.id not in prev_answers:
 						try:
 							post_answer_comment(posts[post.id], a)
 						except:
-							print '----- SKIPPED: Out of retries.'
+							logger.info('----- SKIPPED: Out of retries.')
 							continue
 
 						if post.id in posted:
@@ -262,27 +272,28 @@ if __name__ == '__main__':
 						else:
 							posted[post.id] = [a.id]
 
-						print u'---- New answer from /u/%s' % unicode(a.author).encode('ascii','replace')
+						logger.info(u'---- New answer from /u/%s' % unicode(a.author).encode('ascii','replace'))
 
 					else:
 						prev_answers.remove(a.id)
-						print '---- Answer previously found'
+						logger.info('---- Answer previously found')
 
 				if len(answers) == 0:
-					print '-- No answers found'
+					logger.info('-- No answers found')
 				else:
-					print '-- Answers processed'
+					logger.info('-- Answers processed')
 
 				# anything left in prev_answers failed to meet the answer criteria
 				# (it was probably deleted)
 				if len(prev_answers) > 0:
-					print '-- %d previous answer(s) not found' % len(prev_answers)
+					logger.info('-- %d previous answer(s) not found' % len(prev_answers))
 				for missing in prev_answers:
 					# TODO - delete or replace text with [deleted] on original comment
 					#posts[a.id].set_flair('DELETED') -- will no longer work
-					#print u'-- Marked as Deleted: %s' % posts[a.id].title
-					print 'SHOULD BE MARKED DELETED: %s' % missing
+					#logger.info(u'-- Marked as Deleted: %s' % posts[a.id].title
+					logger.info('SHOULD BE MARKED DELETED: %s' % missing)
 					
+			logger.info('Scan complete')
 
 			# write posted answers to history file
 			with open('history.json', 'w') as outfile:
@@ -291,11 +302,11 @@ if __name__ == '__main__':
 						'posted': posted,
 						'post_ids': post_ids}
 				json.dump(data, outfile)
+			logger.info('History updated')
 
 			# TODO - scan inbox for missed answers
 
-			print 'Scan complete'
-			print 'Waiting %d minutes...' % WAIT_TIME
+			logger.info('Waiting %d minutes...' % WAIT_TIME)
 			# wait 15 minutes
 			time.sleep(60 * WAIT_TIME)
 
