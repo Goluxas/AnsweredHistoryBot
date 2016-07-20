@@ -161,11 +161,12 @@ if __name__ == '__main__':
 	o = OAuth2Util.OAuth2Util(r)
 	print 'Authenticated'
 
+	""" Shouldn't need this anymore
 	if len(post_ids) > 0:
 		print 'Loading previous posts'
 		ah = r.get_subreddit('askhistorians')
 		posts = { cid: r.get_submission(submission_id=pid) for cid, pid in post_ids.iteritems() }
-
+	"""
 
 	try:
 		while True:
@@ -220,19 +221,25 @@ if __name__ == '__main__':
 
 				# if there are any answers, make a thread for the post
 				if post.id not in posts:
-					post_title = META_POST_TITLE % (post.title, post.author)
-					if len(post_title) > 300:
-						# +4 to make up for the two %s clusters in the format string
-						# -3 to make room for the ellipses
-						max_title_length = 300 - len(META_POST_TITLE) + 4 - len(str(post.author)) - 3
-						post_title = META_POST_TITLE % (post.title[:max_title_length] + '...', post.author)
-					post_text = '[ORIGINAL THREAD](%s)' % post.short_link
-					try:
-						posts[post.id] = post_reply(r, answers_sub, post_title, post_text)
-					except:
-						print '-- SKIPPED: Too many retries to post meta thread'
-						continue
+					if post.id in post_ids:
+						# if it was in post_ids, load the post
+						posts[post.id] = r.get_submission(submission_id=post.id)
+					else:
+						# otherwise, make a new post for the thread
+						post_title = META_POST_TITLE % (post.title, post.author)
+						if len(post_title) > 300:
+							# +4 to make up for the two %s clusters in the format string
+							# -3 to make room for the ellipses
+							max_title_length = 300 - len(META_POST_TITLE) + 4 - len(str(post.author)) - 3
+							post_title = META_POST_TITLE % (post.title[:max_title_length] + '...', post.author)
+						post_text = '[ORIGINAL THREAD](%s)' % post.short_link
+						try:
+							posts[post.id] = post_reply(r, answers_sub, post_title, post_text)
+						except:
+							print '-- SKIPPED: Too many retries to post meta thread'
+							continue
 
+				#import pdb; pdb.set_trace()
 				# check for answers from a previous scan
 				if post.id in posted:
 					prev_answers = list(posted[post.id]) # using list() to copy the list
@@ -250,7 +257,10 @@ if __name__ == '__main__':
 							print '----- SKIPPED: Out of retries.'
 							continue
 
-						posted[post.id] = posted.get(post.id, []).append(a.id)
+						if post.id in posted:
+							posted[post.id].append(a.id)
+						else:
+							posted[post.id] = [a.id]
 
 						print u'---- New answer from /u/%s' % unicode(a.author).encode('ascii','replace')
 
@@ -296,7 +306,7 @@ if __name__ == '__main__':
 		traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stdout)
 
 		with open('history.json', 'w') as outfile:
-			post_ids = { answer_id: post.id for answer_id, post in posts.iteritems() }
+			post_ids = { ah_thread_id: post.id for ah_thread_id, post in posts.iteritems() }
 			data = {'scanned': scanned,
 					'posted': posted,
 					'post_ids': post_ids}
